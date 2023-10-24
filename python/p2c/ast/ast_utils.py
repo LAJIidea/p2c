@@ -1,4 +1,6 @@
+import builtins
 from typing import Any
+from enum import Enum
 
 
 class Builder:
@@ -13,6 +15,28 @@ class Builder:
         except Exception as e:
             print(e)
             raise e
+        
+class VariableScopeGuard:
+    def __init__(self,scopes) -> None:
+        self.scopes = scopes
+    
+    def __enter__(self):
+        self.scopes.append({})
+    
+    def __exit__(self, type, value, traceback):
+        self.scopes.pop()
+
+
+class ReturnStatus(Enum):
+    NoReturn = 0
+    ReturnedVoid = 1
+    ReturnedValue = 2
+
+
+class LoopStatus(Enum):
+    Normal = 0
+    Break = 1
+    Continue = 2
 
 
 class ASTContext:
@@ -42,3 +66,23 @@ class ASTContext:
                 break
         self.line_offset = start_line - 1
         self.raised = False
+        self.returned = ReturnStatus.NoReturn
+
+    def variable_scope_guard(self):
+        return VariableScopeGuard(self.local_scopes)
+    
+    def loop_status(self):
+        if self.loop_scopes:
+            return self.loop_scopes[-1].status
+        return LoopStatus.Normal
+    
+    def get_var_by_name(self, name) -> Any:
+        for s in reversed(self.local_scopes):
+            if name in s:
+                return s[name]
+        if name in self.global_vars:
+            return self.global_vars[name]
+        try:
+            return getattr(builtins, name)
+        except AttributeError:
+            raise Exception(f'Variable "{name}" not found')

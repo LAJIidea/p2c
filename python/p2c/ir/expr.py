@@ -39,7 +39,8 @@ class ExprType(Enum):
     Bool = 3,
     Call = 4,
     Binary = 5,
-    Unary = 6
+    Unary = 6,
+    Array = 7,
 
 
 class Expr:
@@ -95,3 +96,9 @@ class Unary(Expr):
         self.expr = expr
         self.op = op
         super().__init__(ExprType.Unary)
+
+
+class Array(Expr):
+    def __init__(self, elements: List[Expr]) -> None:
+        self.elements = elements
+        super().__init__(ExprType.Array)

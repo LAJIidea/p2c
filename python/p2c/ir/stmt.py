@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Dict
 from p2c.ir.expr import Expr, ExprType
 from p2c.ir.primitive_type import PrimType
+from p2c.ir.parameter import Parameter
 
 
 class Ended(Enum):
@@ -53,10 +54,11 @@ class If(Stmt):
 
 
 class For(Stmt):
-    def __init__(self, init: str, bound: Expr, step: int, body: List[Stmt]) -> None:
+    def __init__(self, init: Parameter, bound: str, body: List[Stmt], size = 0, step = 1) -> None:
         self.init = init
         self.bound = bound
         self.body = body
+        self.size = size
         self.step = step
         super().__init__(StmtType.For)
 

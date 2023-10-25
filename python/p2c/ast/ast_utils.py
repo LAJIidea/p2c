@@ -52,6 +52,7 @@ class ASTContext:
         self.func = func
         self.local_scopes = []
         self.loop_scopes = []
+        self.list_data = {}
         self.returns = None
         self.global_vars = global_vars
         self.argument_data = argument_data

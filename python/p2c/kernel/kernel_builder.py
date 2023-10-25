@@ -1,7 +1,7 @@
 from p2c.ast.ast_utils import ASTContext
 from p2c.ir.primitive_type import PrimType
 from p2c.ir.stmt import If, For, While, Assign, Decl, End, Ended
-from p2c.ir.expr import Identifier, Num, String, Boolean, Call, Binary, Unary, BinaryOp, UnaryOp
+from p2c.ir.expr import Identifier, Num, String, Boolean, Call, Binary, Unary, BinaryOp, UnaryOp, Array
 
 
 def primtype_to_ctype(ty):
@@ -58,14 +58,34 @@ class KernelASTBuilder:
     def codegen_decl(self, stmt):
         decl = primtype_to_ctype(stmt.ty) + " "
         for k, v in stmt.pairs.items():
-            decl += f'{k.name} = {self.codegen_expr(v)}, '
+            if isinstance(v, Array):
+                decl += f'{k.name}[{len(v.elements)}] = ' + "{" + self.codegen_expr(v) + "}, "
+            else:
+                decl += f'{k.name} = {self.codegen_expr(v)}, '
         print(self.ident + decl[0:-2] + ";")
 
     def codegen_if(self, stmt):
-        pass
+        expr = self.codegen_expr(stmt.expr)
+        print(self.ident + f"if ({expr}) " + "{")
+        self.ident = self.ident + '  '
+        for st in stmt.body:
+            self.codegen_stmt(st)
+        self.ident = self.ident[:-2]
+        if len(stmt.elbody) != 0:
+            print(self.ident + "} else {")
+            self.ident = self.ident + '  '
+            for elst in stmt.elbody:
+                self.codegen_stmt(elst)
+            self.ident = self.ident[:-2]
+        print(self.ident + "}")
 
     def codegen_for(self, stmt):
-        pass
+        print(f"{self.ident}for (int lower = 0; lower < {stmt.size}; lower += {stmt.step}) " + "{")
+        self.ident = self.ident + '  '
+        print(f"{self.ident}{primtype_to_ctype(stmt.init.ty)} {stmt.init.name} = {stmt.bound}[lower];")
+        for st in stmt.body:
+            self.codegen_stmt(st)
+        self.ident = self.ident[:-2]
 
     def codegen_while(self, stmt):
         pass
@@ -97,6 +117,8 @@ class KernelASTBuilder:
             return self.codegen_binary(expr)
         if isinstance(expr, Unary):
             return self.codegen_unary(expr)
+        if isinstance(expr, Array):
+            return self.codegen_array(expr)
     
     def codegen_id(self, expr) -> str:
         return expr.name
@@ -144,7 +166,9 @@ class KernelASTBuilder:
             BinaryOp.GE: ">=",
             BinaryOp.LE: "<=",
             BinaryOp.Greater: ">",
-            BinaryOp.Lesser: "<"
+            BinaryOp.Lesser: "<",
+            BinaryOp.And: "&&",
+            BinaryOp.Or: "||"
         }.get(expr.op)
         return f'{left} {op} {right}'
 
@@ -156,6 +180,12 @@ class KernelASTBuilder:
         }.get(expr.op)
         e = self.codegen_expr(expr)
         return op + e
+    
+    def codegen_array(self, expr) -> str:
+        elements = []
+        for element in expr.elements:
+            elements.append(self.codegen_expr(element))
+        return ', '.join(elements)
 
     def dump(self, ir):
         print("#include<stdio.h>")

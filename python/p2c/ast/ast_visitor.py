@@ -4,7 +4,7 @@ from p2c.ir.moduler import Moduler
 from p2c.ir.func import Func
 from p2c.ir.parameter import Parameter
 from p2c.ir.primitive_type import PrimType
-from p2c.ir.expr import Expr, Identifier, Num, String, Boolean, Call, Binary, BinaryOp, Unary, UnaryOp
+from p2c.ir.expr import Expr, Identifier, Num, String, Boolean, Call, Binary, BinaryOp, Unary, UnaryOp, Array
 from p2c.ir.stmt import Stmt, If, For, While, Decl, Assign, End, Ended, AugOp
 from p2c.ir.record import Record
 
@@ -64,6 +64,8 @@ def handler_expr_type(expr, ctx):
                 return PrimType.Float
         else:
             return PrimType.Bool
+    if isinstance(expr, Array):
+        return handler_expr_type(expr.elements[0], ctx)
     else:
         if expr.op is UnaryOp.Tiled:
             return PrimType.Int
@@ -137,8 +139,10 @@ class ASTVisitor(Builder):
                 pairs[targets[i]] = init
             return Decl(pairs, base_ty)
         else:
-            base_ty = handler_expr_type(inits, ctx)
             var_name = node.targets[0].id
+            if isinstance(inits, Array):
+                ctx.list_data[var_name] = inits
+            base_ty = handler_expr_type(inits, ctx)
             var_type_check(ctx, base_ty, var_name)
             target = Identifier(var_name)
             if not ctx.is_var_declared(var_name):
@@ -188,12 +192,12 @@ class ASTVisitor(Builder):
     
     @staticmethod
     def visit_BoolOp(ctx, node):
-        visit_stmts(node.values)
+        values = visit_stmts(ctx, node.values)
         op = {
             ast.And: BinaryOp.And,
             ast.Or: BinaryOp.Or,
         }.get(type(node.op))
-        print(node)
+        return Binary(values[0], values[1], op)
 
     @staticmethod
     def visit_Compare(ctx, node):
@@ -218,6 +222,43 @@ class ASTVisitor(Builder):
             ty = handler_expr_type(expr, ctx)
             ctx.return_ty = ty
         return End(Ended.Return, expr)
+    
+    @staticmethod
+    def visit_If(ctx, node):
+        with ctx.variable_scope_guard():
+            expr = visit_stmt(ctx, node.test)
+            # some issue here, `if a:` is right, but a is not boolean 
+            if handler_expr_type(expr, ctx) is not PrimType.Bool:
+                raise Exception("If condition must be bool")
+            body = visit_stmts(ctx, node.body)
+            orelse = visit_stmts(ctx, node.orelse)
+        return If(expr, body, orelse)
+    
+    @staticmethod
+    def visit_List(ctx, node):
+        elements = visit_stmts(ctx, node.elts)
+        if len(elements) == 0:
+            raise Exception("Array init must have elements")
+        ty = handler_expr_type(elements[0], ctx)
+        flag = all(handler_expr_type(element, ctx) is ty for element in elements)
+        if not flag:
+            raise Exception("p2c not support multiply type in array")
+        return Array(elements)
+    
+    @staticmethod
+    def visit_For(ctx, node):
+        with ctx.variable_scope_guard():
+            # Just support list iterations
+            # !!! Notice: lower is can not be a variable name
+            if node.iter.id not in ctx.list_data:
+                raise Exception(f"Can not found array {node.iter.id}")
+            size = len(ctx.list_data[node.iter.id].elements)
+            ty = handler_expr_type(ctx.list_data[node.iter.id], ctx)
+            init = Parameter(node.target.id, ty)
+            ctx.create_variable(node.target.id, ty)
+            bound = node.iter.id
+            body = visit_stmts(ctx, node.body)
+        return For(init, bound, body, size, 1)
 
 
 visit_stmt = ASTVisitor()

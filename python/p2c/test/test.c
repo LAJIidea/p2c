@@ -40,6 +40,6 @@ int main() {
 
     // Free the captured context
     free(&ctx);
-
+    int a = 3, b = 4;
     return 0;
 }

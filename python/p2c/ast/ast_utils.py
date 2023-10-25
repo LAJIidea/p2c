@@ -17,14 +17,14 @@ class Builder:
             raise e
         
 class VariableScopeGuard:
-    def __init__(self,scopes) -> None:
-        self.scopes = scopes
+    def __init__(self, ctx) -> None:
+        self.ctx = ctx
     
     def __enter__(self):
-        self.scopes.append({})
+        self.ctx.local_scopes.append({})
     
     def __exit__(self, type, value, traceback):
-        self.scopes.pop()
+        self.ctx.local_scopes.pop()
 
 
 class ReturnStatus(Enum):
@@ -47,7 +47,7 @@ class ASTContext:
                  argument_data=None,
                  file=None,
                  src=None,
-                 start_line=None
+                 start_line=None,
                 ) -> None:
         self.func = func
         self.local_scopes = []
@@ -67,9 +67,32 @@ class ASTContext:
         self.line_offset = start_line - 1
         self.raised = False
         self.returned = ReturnStatus.NoReturn
+        self.closure = False
+        self.return_ty = None
 
+    def current_scope(self):
+        return self.local_scopes[-1]
+
+    def is_var_declared(self, name):
+        for s in self.local_scopes:
+            if name in s:
+                return True
+        return False
+    
+    def is_var_prevs(self, name):
+        for s in self.local_scopes[0:-1]:
+            if name in s:
+                return True
+        return False
+
+    def create_variable(self, name, var):
+        if name in self.current_scope():
+            raise Exception(f'Redefinede variable {name}')
+        self.current_scope()[name] = var
+
+        
     def variable_scope_guard(self):
-        return VariableScopeGuard(self.local_scopes)
+        return VariableScopeGuard(self)
     
     def loop_status(self):
         if self.loop_scopes:

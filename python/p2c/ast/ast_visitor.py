@@ -4,8 +4,8 @@ from p2c.ir.moduler import Moduler
 from p2c.ir.func import Func
 from p2c.ir.parameter import Parameter
 from p2c.ir.primitive_type import PrimType
-from p2c.ir.expr import Expr, Identifier, Num, String, Boolean, Call, Binary, BinaryOp, Unary, UnaryOp, Array
-from p2c.ir.stmt import Stmt, If, For, While, Decl, Assign, End, Ended, AugOp, Closure
+from p2c.ir.expr import Expr, Identifier, Num, String, Boolean, Call, Binary, BinaryOp, Unary, UnaryOp, Array, Subscript
+from p2c.ir.stmt import Stmt, If, For, While, Decl, Assign, End, Ended, AugOp, Closure, StmtExpr
 from p2c.ir.record import Record
 
 
@@ -73,7 +73,7 @@ def handler_expr_type(expr, ctx):
     if isinstance(expr, Binary):
         if expr.op in [BinaryOp.BitAnd, BinaryOp.BitOr, BinaryOp.BitXor, BinaryOp.LShift, BinaryOp.RShift]:
             return PrimType.Int
-        if expr.op in [BinaryOp.Add, BinaryOp.Sub, BinaryOp.Div, BinaryOp.Times, BinaryOp.Floor]:
+        if expr.op in [BinaryOp.Add, BinaryOp.Sub, BinaryOp.Div, BinaryOp.Times, BinaryOp.Floor, BinaryOp.Mod]:
             if handler_expr_type(expr.left, ctx) is PrimType.Int and handler_expr_type(expr.left, ctx) is PrimType.Int:
                 return PrimType.Int
             else:
@@ -101,6 +101,8 @@ class ASTVisitor(Builder):
     @staticmethod
     def visit_Module(ctx, node):
         bodys = []
+        # handler builtin function
+        Record.log["print"] = Func("printf", [Parameter("str", PrimType.String)], PrimType.Void, [])
         with ctx.variable_scope_guard():
             ctx.create_variable("new_closure", PrimType.Closure)
             for stmt in node.body:
@@ -320,6 +322,15 @@ class ASTVisitor(Builder):
     def visit_Call(ctx, node):
         func = visit_stmt(ctx, node.func)
         args = visit_stmts(ctx, node.args)
+
+        builtin_func = {
+            "print": "printf",
+            "len": "strlen",
+        }
+
+        if func.name in builtin_func:
+            func.name = builtin_func[func.name]
+
         call = Call(func.name, args)
         if func.name == "new_closure":
             call.closure = True
@@ -329,6 +340,26 @@ class ASTVisitor(Builder):
             else:
                 raise Exception(f"Can not find function {node.func.id} declared")
         return call
+    
+    @staticmethod
+    def visit_Expr(ctx, node):
+        return StmtExpr(visit_stmt(ctx, node.value))
+    
+    @staticmethod
+    def visit_Subscript(ctx, node):
+        index = visit_stmt(ctx, node.slice)
+        value = visit_stmt(ctx, node.value)
+        return Subscript(value, index)
+    
+    @staticmethod
+    def visit_UnaryOp(ctx, node):
+        op = {
+            ast.Invert: UnaryOp.Tiled,
+            ast.Not: UnaryOp.Bang,
+            ast.USub: UnaryOp.Minus,
+        }.get(type(node.op))
+        operand = visit_stmt(ctx, node.operand)
+        return Unary(operand, op)
 
 
 visit_stmt = ASTVisitor()

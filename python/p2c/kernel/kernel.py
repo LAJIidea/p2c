@@ -3,10 +3,12 @@ import types
 import typing
 import textwrap
 import ast
+from typing import Any
 from p2c.kernel.kernel_arguments import KernelArgument
 from p2c.kernel.kernel_builder import KernelASTBuilder
 from p2c.ast.ast_utils import ASTContext
 from p2c.ast.transform import transform_ast
+from p2c.ir.record import Record
 
 
 # beautilful to handler closure, but not suitable this pretask
@@ -47,17 +49,19 @@ def get_tree_and_ctx(
     )
 
 
-class Kernel:
+class translate:
     counter = 0
 
     def __init__(self, _func, _classkernel=False) -> None:
         self.func = _func
-        self.kernel_counter = Kernel.counter
-        Kernel.counter += 1
+        self.kernel_counter = translate.counter
+        translate.counter += 1
         self.arguments = []
         self.return_type = None
         self.classkernel = _classkernel
         self.extract_arguments()
+        self.compile()
+        Record.kernels.append(self)
 
     def extract_arguments(self):
         sig = inspect.signature(self.func)
@@ -88,14 +92,16 @@ class Kernel:
             else:
                 self.arguments.append(KernelArgument(annotation, param.name, param.default))
 
-    def translate(self) -> str:
+    def compile(self) -> None:
         tree, ctx = get_tree_and_ctx(self, arg_features=None, args=None)
-        ir = transform_ast(tree, ctx)
-        builder = KernelASTBuilder(ctx)
-        builder.dump(ir)
-        return ""
+        self.ir = transform_ast(tree, ctx)
+    
+    def dump(self) -> None:
+        builder = KernelASTBuilder()
+        builder.dump(self.ir)
 
+    def jit(self) -> None:
+        pass
 
-def translate(fn):
-    primal = Kernel(fn, _classkernel=False)
-    return primal.translate()
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        pass

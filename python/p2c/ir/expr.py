@@ -41,6 +41,7 @@ class ExprType(Enum):
     Binary = 5,
     Unary = 6,
     Array = 7,
+    Subscript = 8
 
 
 class Expr:
@@ -103,3 +104,10 @@ class Array(Expr):
     def __init__(self, elements: List[Expr]) -> None:
         self.elements = elements
         super().__init__(ExprType.Array)
+
+
+class Subscript(Expr):
+    def __init__(self, array: Expr, index: Expr) -> None:
+        self.array = array
+        self.index = index
+        super().__init__(ExprType.Subscript)

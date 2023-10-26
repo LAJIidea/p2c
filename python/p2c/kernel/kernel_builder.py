@@ -1,8 +1,7 @@
-from p2c.ast.ast_utils import ASTContext
 from p2c.ir.primitive_type import PrimType
 from p2c.ir.record import Record
-from p2c.ir.stmt import If, For, While, Assign, Decl, End, Ended, AugOp, Closure
-from p2c.ir.expr import Identifier, Num, String, Boolean, Call, Binary, Unary, BinaryOp, UnaryOp, Array
+from p2c.ir.stmt import If, For, While, Assign, Decl, End, Ended, AugOp, Closure, StmtExpr
+from p2c.ir.expr import Identifier, Num, String, Boolean, Call, Binary, Unary, BinaryOp, UnaryOp, Array, Subscript
 
 
 def primtype_to_ctype(ty):
@@ -25,8 +24,7 @@ def primtype_to_ctype(ty):
 
 
 class KernelASTBuilder:
-    def __init__(self, ctx: ASTContext) -> None:
-        self.ctx = ctx
+    def __init__(self) -> None:
         self.ident = ''
 
     def codegen_module(self, mod):
@@ -61,6 +59,8 @@ class KernelASTBuilder:
             self.codegen_assign(stmt)
         elif isinstance(stmt, Closure):
             self.codegen_closure(stmt)
+        elif isinstance(stmt, StmtExpr):
+            self.codegen_stmt_expr(stmt.expr)
         else:
             self.codegen_end(stmt)
 
@@ -137,6 +137,9 @@ class KernelASTBuilder:
         for k in data:
             print(f"{self.ident}new_closure->{k.name} = {k.name};")
 
+    def codegen_stmt_expr(self, stmt):
+        expr = self.codegen_expr(stmt)
+        print(f"{self.ident}{expr};")
 
     def codegen_expr(self, expr) -> str:
         if isinstance(expr, Identifier):
@@ -155,6 +158,8 @@ class KernelASTBuilder:
             return self.codegen_unary(expr)
         if isinstance(expr, Array):
             return self.codegen_array(expr)
+        if isinstance(expr, Subscript):
+            return self.codegen_subscript(expr)
     
     def codegen_id(self, expr) -> str:
         if expr.closure:
@@ -219,7 +224,7 @@ class KernelASTBuilder:
             UnaryOp.Minus: "-",
             UnaryOp.Tiled: "~"
         }.get(expr.op)
-        e = self.codegen_expr(expr)
+        e = self.codegen_expr(expr.expr)
         return op + e
     
     def codegen_array(self, expr) -> str:
@@ -227,8 +232,13 @@ class KernelASTBuilder:
         for element in expr.elements:
             elements.append(self.codegen_expr(element))
         return ', '.join(elements)
-
-    def dump(self, ir):
+    
+    def codegen_subscript(self, expr) -> str:
+        val = self.codegen_expr(expr.array)
+        idx = self.codegen_expr(expr.index)
+        return f'{val}[{idx}]'
+    
+    def init_handle(self):
         print("#include<stdio.h>")
         print("#include <math.h>")
         for k, v in Record.closure.items():
@@ -243,4 +253,11 @@ class KernelASTBuilder:
             print("} closure;")
             self.codegen_func(v.func)
 
+    def dump(self, ir):
+        self.init_handle()
         self.codegen_func(ir.body[0])
+
+    def build_all(self):
+        self.init_handle()
+        for ir in Record.kernels:
+            self.codegen_func(ir.ir.body[0])

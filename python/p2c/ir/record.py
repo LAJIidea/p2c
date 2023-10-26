@@ -6,3 +6,4 @@ class Record:
   closure = {}
   global_var = {}
   closure_scope = Stack()
+  kernels = []

@@ -10,3 +10,4 @@ class PrimType(Enum):
     Struct = 5,
     Function = 6,
     Closure = 7,
+    Void = 8,

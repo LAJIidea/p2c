@@ -10,5 +10,5 @@ def outer(a: int, b: int):
     return inner
 
 
-# print(outer(1, 2))
-print(outer)
+# outer(1, 2).dump()
+outer.dump()

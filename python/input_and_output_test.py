@@ -2,8 +2,8 @@ from p2c.kernel.kernel import translate
 
 
 @translate
-def main():
-  return 0
+def test(a: int, b: int):
+    return a + b
 
 
-print(main())
+test.dump()

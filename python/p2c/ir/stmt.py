@@ -29,6 +29,7 @@ class StmtType(Enum):
     Assign = 4
     End = 5,
     Closure = 6,
+    StmtExpr = 7
 
 
 class Stmt:
@@ -91,3 +92,9 @@ class Closure(Stmt):
         self.func = func
         self.data = data
         super().__init__(StmtType.Closure)
+
+
+class StmtExpr(Stmt):
+    def __init__(self, expr: Expr) -> None:
+        self.expr = expr
+        super().__init__(StmtExpr)

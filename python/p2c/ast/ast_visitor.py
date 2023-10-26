@@ -5,7 +5,7 @@ from p2c.ir.func import Func
 from p2c.ir.parameter import Parameter
 from p2c.ir.primitive_type import PrimType
 from p2c.ir.expr import Expr, Identifier, Num, String, Boolean, Call, Binary, BinaryOp, Unary, UnaryOp, Array
-from p2c.ir.stmt import Stmt, If, For, While, Decl, Assign, End, Ended, AugOp
+from p2c.ir.stmt import Stmt, If, For, While, Decl, Assign, End, Ended, AugOp, Closure
 from p2c.ir.record import Record
 
 
@@ -13,6 +13,27 @@ def var_type_check(ctx, ty, name):
     if ctx.is_var_declared(name):
         if ctx.get_var_by_name(name) is not ty:
             raise Exception("C not support dynamic type")
+        
+
+def catch_closure_var(var_name, base_ty):
+    var = Parameter(var_name, base_ty)
+    if var not in Record.closure_scope.peek():
+        Record.closure_scope.peek().append(Parameter(var_name, base_ty))
+
+
+def type_str_to_primtype(ty):
+    if ty == "int":
+        return PrimType.Int
+    if ty == "float":
+        return PrimType.Float
+    if ty == "List":
+        return PrimType.Array
+    if ty == "bool":
+        return PrimType.Bool
+    if ty == "str":
+        return PrimType.String
+    if ty == "closure":
+        return PrimType.Closure
 
 
 def builtin_to_primtype(ty):
@@ -81,12 +102,14 @@ class ASTVisitor(Builder):
     def visit_Module(ctx, node):
         bodys = []
         with ctx.variable_scope_guard():
+            ctx.create_variable("new_closure", PrimType.Closure)
             for stmt in node.body:
                 bodys.append(visit_stmt(ctx, stmt))
         return Moduler(bodys)
 
     @staticmethod
     def visit_FunctionDef(ctx, node):
+        # Just support one nested function
         args = node.args
         parameters = []
         ret = None
@@ -97,21 +120,46 @@ class ASTVisitor(Builder):
                     ctx.create_variable(arg.arg, param_ty)
                     parameters.append(Parameter(arg.arg, param_ty))
                 else:
-                    ctx.create_variable(arg.arg, None)
-                    parameters.append(Parameter(arg.arg, None))
+                    param_ty = type_str_to_primtype(arg.annotation.id)
+                    ctx.create_variable(arg.arg, param_ty)
+                    parameters.append(Parameter(arg.arg, param_ty))
+            if ctx.inner_func > 0 and ctx.closure is not True:
+                ctx.closure = True
+                Record.closure_scope.push([])
+            ctx.inner_func += 1
             body = visit_stmts(ctx, node.body)
         if node.returns is not None:
             pass
         else:
             ret = ctx.return_ty
         fn = Func(node.name, parameters, ret, body)
+        ctx.return_ty = None
         Record.log[node.name] = fn
+        ctx.inner_func -= 1
+        flag = ctx.closure
+        if flag and ctx.inner_func <= 1:
+            ctx.closure = False
+        if flag:
+            closure_data = Record.closure_scope.peek()
+            closure = Closure(fn, closure_data)
+            Record.closure[node.name] = closure
+            Record.closure_scope.pop()
+            ctx.create_variable(node.name, PrimType.Closure)
+            Record.log["new_closure"] = fn
+            return closure
         return fn
 
   
     @staticmethod
     def visit_Name(ctx, node):
-        return Identifier(node.id)
+        if ctx.current_scope().get(node.id) is not None:
+            if ctx.current_scope()[node.id] is PrimType.Closure:
+                return Identifier("new_closure") 
+        id = Identifier(node.id)
+        if ctx.closure and ctx.is_var_prevs(node.id, 1):
+            id.closure = True
+            catch_closure_var(node.id, ctx.get_var_by_name(node.id))
+        return id
 
     @staticmethod
     def visit_AnnAssign(ctx, node):
@@ -148,9 +196,10 @@ class ASTVisitor(Builder):
             if not ctx.is_var_declared(var_name):
                 ctx.create_variable(var_name, base_ty)
             else:
-                if ctx.closure and ctx.is_var_prevs(var_name):
+                if ctx.closure and ctx.is_var_prevs(var_name, 1):
                     target.closure = True
-                return Assign(target, AugOp.Base)
+                    catch_closure_var(var_name, base_ty)
+                return Assign(target, inits, AugOp.Base)
             pairs[target] = inits
         return Decl(pairs, base_ty)
         
@@ -259,6 +308,27 @@ class ASTVisitor(Builder):
             bound = node.iter.id
             body = visit_stmts(ctx, node.body)
         return For(init, bound, body, size, 1)
+    
+    @staticmethod
+    def visit_While(ctx, node):
+        with ctx.variable_scope_guard():
+            expr = visit_stmt(ctx, node.test)
+            body = visit_stmts(ctx, node.body)
+        return While(expr, body)
+    
+    @staticmethod
+    def visit_Call(ctx, node):
+        func = visit_stmt(ctx, node.func)
+        args = visit_stmts(ctx, node.args)
+        call = Call(func.name, args)
+        if func.name == "new_closure":
+            call.closure = True
+        if node.func.id not in Record.log:
+            if ctx.is_var_declared(func.name) and ctx.get_var_by_name(func.name) == PrimType.Closure:
+                call.closure = True
+            else:
+                raise Exception(f"Can not find function {node.func.id} declared")
+        return call
 
 
 visit_stmt = ASTVisitor()

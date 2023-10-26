@@ -77,9 +77,10 @@ class Boolean(Expr):
 
 
 class Call(Expr):
-    def __init__(self, name: str, args: List[Expr]) -> None:
+    def __init__(self, name: str, args: List[Expr], closure = False) -> None:
         self.name = name
         self.args = args
+        self.closure = closure
         super().__init__(ExprType.Call)
 
   

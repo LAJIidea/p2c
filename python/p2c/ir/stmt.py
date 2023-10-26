@@ -27,7 +27,8 @@ class StmtType(Enum):
     While = 2,
     Decl = 3,
     Assign = 4
-    End = 5
+    End = 5,
+    Closure = 6,
 
 
 class Stmt:
@@ -83,3 +84,10 @@ class End(Stmt):
         self.ended = ended
         self.init = init
         super().__init__(StmtType.End)
+
+
+class Closure(Stmt):
+    def __init__(self, func, data) -> None:
+        self.func = func
+        self.data = data
+        super().__init__(StmtType.Closure)

@@ -2,11 +2,13 @@ from p2c.kernel.kernel import translate
 
 
 @translate
-def sim(a: int, b: int):
-    d = [2, 3, 4]
-    for i in d:
-        if i == a or i == b:
-            return i
+def outer(a: int, b: int):
+    d = a + b
+    # @translate
+    def inner(c: int):
+        return d + c
+    return inner
 
 
-print(sim)
+# print(outer(1, 2))
+print(outer)

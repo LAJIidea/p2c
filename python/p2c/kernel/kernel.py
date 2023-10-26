@@ -9,6 +9,7 @@ from p2c.ast.ast_utils import ASTContext
 from p2c.ast.transform import transform_ast
 
 
+# beautilful to handler closure, but not suitable this pretask
 def get_global_vars(_func):
     global_vars = _func.__globals__.copy()
 

@@ -9,4 +9,4 @@ class PrimType(Enum):
     Array = 4,
     Struct = 5,
     Function = 6,
-    Closure = 7
+    Closure = 7,

@@ -70,6 +70,7 @@ class ASTContext:
         self.returned = ReturnStatus.NoReturn
         self.closure = False
         self.return_ty = None
+        self.inner_func = 0
 
     def current_scope(self):
         return self.local_scopes[-1]
@@ -80,8 +81,8 @@ class ASTContext:
                 return True
         return False
     
-    def is_var_prevs(self, name):
-        for s in self.local_scopes[0:-1]:
+    def is_var_prevs(self, name, level=1):
+        for s in self.local_scopes[0:-level]:
             if name in s:
                 return True
         return False

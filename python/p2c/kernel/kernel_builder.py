@@ -1,6 +1,7 @@
 from p2c.ast.ast_utils import ASTContext
 from p2c.ir.primitive_type import PrimType
-from p2c.ir.stmt import If, For, While, Assign, Decl, End, Ended
+from p2c.ir.record import Record
+from p2c.ir.stmt import If, For, While, Assign, Decl, End, Ended, AugOp, Closure
 from p2c.ir.expr import Identifier, Num, String, Boolean, Call, Binary, Unary, BinaryOp, UnaryOp, Array
 
 
@@ -17,6 +18,10 @@ def primtype_to_ctype(ty):
         return "char *"
     if ty is PrimType.Function:
         return ""
+    if ty is PrimType.Closure:
+        return "closure*"
+    if ty is None:
+        return "void"
 
 
 class KernelASTBuilder:
@@ -32,6 +37,8 @@ class KernelASTBuilder:
         ret = func.returned
         parameters = func.parameters
         param_list = ''
+        if name in Record.closure:
+            param_list += "closure* cl, "
         for param in parameters:
             param_list += f"{primtype_to_ctype(param.ty)} {param.name}, "
         param_list = param_list[0:-2]
@@ -52,6 +59,8 @@ class KernelASTBuilder:
             self.codegen_while(stmt)
         elif isinstance(stmt, Assign):
             self.codegen_assign(stmt)
+        elif isinstance(stmt, Closure):
+            self.codegen_closure(stmt)
         else:
             self.codegen_end(stmt)
 
@@ -88,10 +97,26 @@ class KernelASTBuilder:
         self.ident = self.ident[:-2]
 
     def codegen_while(self, stmt):
-        pass
+        expr = self.codegen_expr(stmt.expr)
+        print(self.ident + f"while ({expr}) " + "{")
+        self.ident = self.ident + '  '
+        for st in stmt.body:
+            self.codegen_stmt(st)
+        self.ident = self.ident[:-2]
+        print(self.ident + "}")
 
     def codegen_assign(self, stmt):
-        pass
+        expr = self.codegen_expr(stmt.right)
+        target = self.codegen_expr(stmt.left)
+        op = {
+            AugOp.Add: "+=",
+            AugOp.Sub: "-=",
+            AugOp.Times: "*=",
+            AugOp.Div: "/=",
+            AugOp.Base: "=",
+            AugOp.Bit: "%="
+        }.get(stmt.op)
+        print(self.ident + f"{target} {op} {expr};")
 
     def codegen_end(self, stmt):
         if stmt.ended is Ended.Continue:
@@ -101,6 +126,17 @@ class KernelASTBuilder:
         elif stmt.ended is Ended.Return:
             expr = self.codegen_expr(stmt.init)
             print(f"{self.ident}return {expr};")
+        elif stmt.ended is Ended.Pass:
+            pass
+
+    def codegen_closure(self, stmt):
+        fn = stmt.func.name
+        data = stmt.data
+        print(f"{self.ident}closure* new_closure = malloc(sizeof(closure));")
+        print(f"{self.ident}new_closure->fun = {fn};")
+        for k in data:
+            print(f"{self.ident}new_closure->{k.name} = {k.name};")
+
 
     def codegen_expr(self, expr) -> str:
         if isinstance(expr, Identifier):
@@ -121,6 +157,8 @@ class KernelASTBuilder:
             return self.codegen_array(expr)
     
     def codegen_id(self, expr) -> str:
+        if expr.closure:
+            return f'new_closure->{expr.name}'
         return expr.name
 
     def codegen_num(self, expr) -> str:
@@ -140,6 +178,9 @@ class KernelASTBuilder:
         for arg in expr.args:
             args.append(self.codegen_expr(arg))
         arguments = ', '.join(args)
+        if expr.closure:
+            arguments = f'{expr.name}, ' + arguments if len(arguments) != 0 else f'{expr.name}'
+            call = f'{expr.name}->fun({arguments})'
         call = f'{expr.name}({arguments})'
         return call
 
@@ -190,4 +231,16 @@ class KernelASTBuilder:
     def dump(self, ir):
         print("#include<stdio.h>")
         print("#include <math.h>")
+        for k, v in Record.closure.items():
+            print("typedef struct closure {")
+            parameters = v.func.parameters
+            args = "struct closure* cl, "
+            for param in parameters:
+                args += f"{primtype_to_ctype(param.ty)} {param.name}, "
+            print(f"  void (*fun)({args[0:-2]});")
+            for var in v.data:
+                print(f"  {primtype_to_ctype(var.ty)} {var.name};")
+            print("} closure;")
+            self.codegen_func(v.func)
+
         self.codegen_func(ir.body[0])

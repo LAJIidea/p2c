@@ -51,5 +51,6 @@ find_package(pybind11 CONFIG REQUIRED)
 
 include_directories(${PYTHON_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/csrc)
+include_directories(${PROJECT_BINARY_DIR}/csrc)
 
 add_subdirectory(csrc)

@@ -1,7 +1,6 @@
 #ifndef FIR_DIALECT
 #define FIR_DIALECT
 
-include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
@@ -21,6 +20,7 @@ def FIR_Dialect : Dialect {
 // Base Operation defitions.
 //===----------------------------------------------------------------------===//
 
-class FIR_Op<string>
+class FIR_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<FIR_Dialect, mnemonic, traits>;
 
 #endif // FIR_DIALECT

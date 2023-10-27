@@ -1,14 +1,4 @@
-add_subdirectory(mlir)
-
-
-file(GLOB SRCS_CPP 
-    ast/*.cpp
-    jit/*.cpp
-    )
-
-add_library(p2c STATIC ${SRCS_CPP})
-
-target_link_libraries(p2c ${PYTHON_LIBRARIES})
+add_subdirectory(core)
 
 file(GLOB BIND_SRC
     python/*.cpp
@@ -21,4 +11,4 @@ if (MSVC)
     set_property(TARGET p2c_bind APPEND PROPERTY LINK_FLAGS /DEBUG)
 endif ()
 
-target_link_libraries(p2c_bind PRIVATE p2c)
+target_link_libraries(p2c_bind PRIVATE p2c_core)

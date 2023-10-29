@@ -1,8 +1,10 @@
 add_subdirectory(dialect)
 add_subdirectory(codegen)
+add_subdirectory(conversion)
 add_subdirectory(jit)
 add_subdirectory(runtime)
+# add_subdirectory(pygen)
 
 file(GLOB CORE_SRCS p2c.cpp)
 add_library(p2c_core ${CORE_SRCS})
-target_link_libraries(p2c_core ${PYTHON_LIBRARIES})
+target_link_libraries(p2c_core ${PYTHON_LIBRARIES} p2c_codegen p2c_conversion p2c_jit)

@@ -52,28 +52,33 @@ def get_tree_and_ctx(
 class translate:
     counter = 0
 
-    def __init__(self, _func, _classkernel=False) -> None:
+    def __init__(self, _func, classkernel=None, enable_jit=False) -> None:
         self.func = _func
         self.kernel_counter = translate.counter
         translate.counter += 1
         self.arguments = []
         self.return_type = None
-        self.classkernel = _classkernel
+        # self.classkernel = _classkernel
         self.extract_arguments()
         self.compile()
         Record.kernels.append(self)
+        self.banckend = None
+
+    def enable_jit(self):
+        from .p2c_bind import Backend
+        self.backend = Backend()
 
     def extract_arguments(self):
         sig = inspect.signature(self.func)
         if sig.return_annotation not in (inspect._empty, None):
             self.return_type = sig.return_annotation
-            if isinstance(self.return_type, (types.GenericAlias, typing._GebericAlias)) and self.return_type.__origin__ is tuple:
-                self.return_type = self.return_type.__args__
-            if not isinstance(self.return_type, (list, tuple)):
-                self.return_type = (self.return_type)
-            for return_type in self.return_type:
-                if return_type is Ellipsis:
-                    pass
+            # if isinstance(self.return_type, (types.GenericAlias, typing._GebericAlias)) and self.return_type.__origin__ is tuple:
+            #     self.return_type = self.return_type.__args__
+            # if not isinstance(self.return_type, (list, tuple)):
+            #     self.return_type = (self.return_type)
+            # for return_type in self.return_type:
+            #     if return_type is Ellipsis:
+            #         pass
         params = sig.parameters
         arg_names = params.keys()
         for i, arg_name in enumerate(arg_names):
@@ -100,8 +105,36 @@ class translate:
         builder = KernelASTBuilder()
         builder.dump(self.ir)
 
-    def jit(self) -> None:
-        pass
+    def dumpMLIR(self) -> None:
+        if self.backend is not None:
+            src = inspect.getsource(self.func)
+            file = inspect.getsourcefile(self.func)
+            self.backend.emitIR(src, file)
+        else:
+            print("Please enable jit to dump MLIR")
+    
+    def construct_arg_dict(self, *args):
+        args_dict = {}
+        for i, arg_name in enumerate(self.arguments):
+            args_dict[arg_name.name] = args[i]
+        return args_dict
+
+    def jit(self, args) -> None:
+        if self.backend is not None:
+            # args_dict = self.construct_arg_dict(*args)
+            if self.backend.lookup(self.func.__name__):
+                return self.backend.invoke(self.func.__name__, args)
+            else:
+                src = inspect.getsource(self.func)
+                file = inspect.getsourcefile(self.func)
+                self.backend.jitCompile(src, file, self.func.__name__)
+                return self.backend.invoke(self.func.__name__, args)
+        else:
+            print("Please enable jit to compile")
+
+    def optimizeDCE(self) -> None:
+        if self.backend is not None:
+            self.backend.setOptimization(True)
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-        pass
+        return self.func(*args, **kwds)

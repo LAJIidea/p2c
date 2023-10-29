@@ -21,7 +21,7 @@ target_link_libraries(p2c_codegen PUBLIC ${PYTHON_LIBRARIES}
     MLIRPass
     MLIRSideEffectInterfaces
     MLIRControlFlowInterfaces
-    InferTypeOpInterface
-    LoopLikeInterface
+    MLIRInferTypeOpInterface
+    MLIRLoopLikeInterface
     MLIRTransforms
 )

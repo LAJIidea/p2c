@@ -1,0 +1,6 @@
+mkdir build
+cd build
+source python3.9.8
+cmake -G Ninja -DLLVM_DIR=${YOUR_PATH} -DMLIR_DIR=${YOU_PATH} -Dpybind11_DIR=${YOU_PATH} ..
+ninja
+cp lib/p2c_bind.cp39-${YOU_TARGET}.so ../python/p2c/kernel

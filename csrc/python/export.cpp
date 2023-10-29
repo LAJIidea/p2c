@@ -1,10 +1,16 @@
 #include "python/export.h"
-// #include "ast/codegen.h"
+#include "core/p2c.h"
 
 namespace p2c {
 
 void export_module(py::module& m) {
-// m.def("test_code", &test_code);
+    py::class_<Backend, std::shared_ptr<Backend>>(m, "Backend")
+        .def(py::init<>())
+        .def("emitIR", &Backend::emitIR, "")
+        .def("jitCompile", &Backend::jitCompile, "")
+        .def("setOptimization", &Backend::setOptimization, "")
+        .def("lookup", &Backend::lookup, "")
+        .def("invoke", &Backend::invoke, "");
 }
 
 PYBIND11_MODULE(p2c_bind, m) {

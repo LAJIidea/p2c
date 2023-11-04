@@ -1,4 +1,6 @@
 # p2c
+前端核心目的是实现Python功能完全使用C语言来替换，后端核心目的是利用MLIR实现Python语言的高效优化
+**注意：该项目已经quint-lang中的一个子项目，请移动到quint-lang仓库**
 
 这是一个将Python翻译成C的项目，项目结构为:
 ├─.vscode
